@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'habitos-v1';
+const CACHE_VERSION = 'habitos-v2';
 const ASSETS = [
   './',
   './index.html',

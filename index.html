@@ -4,18 +4,59 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
 <title>Hábitos</title>
-<meta name="theme-color" content="#16645a">
+<meta name="theme-color" content="#16645a" id="themeColorMeta">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Hábitos">
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <link rel="icon" href="icons/icon-192.png">
+<script>
+(function(){
+  try{
+    var t = localStorage.getItem('habitos_theme');
+    if(t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t);
+  }catch(e){}
+})();
+</script>
 <style>
 :root{
   --bg:#0f1720; --card:#182430; --card2:#1e2c3a; --border:#2a3949;
   --text:#eef3f6; --muted:#8aa0b3; --accent:#20a893; --accent-d:#16645a;
   --danger:#e2554f; --warn:#e0a934; --radius:16px;
+  --missed-bg:#3a2226; --missed-text:#e2938e;
+  --toast-bg:#26343f; --toast-text:#fff;
+  --sync-ok-bg:#1d3d34; --sync-ok-text:#4fd8b8;
+  --sync-off-bg:#3a3020; --sync-off-text:var(--warn);
+  --sync-err-bg:#3a2226; --sync-err-text:#e2938e;
+  --backdrop:rgba(0,0,0,.55);
+  color-scheme: dark;
+}
+:root[data-theme="light"]{
+  --bg:#f4f7f8; --card:#ffffff; --card2:#eef2f5; --border:#dde3e8;
+  --text:#182430; --muted:#5c7080; --accent:#149984; --accent-d:#0e6f5f;
+  --danger:#c8392f; --warn:#b5790f;
+  --missed-bg:#fbe4e2; --missed-text:#a4362c;
+  --toast-bg:#2a3742; --toast-text:#fff;
+  --sync-ok-bg:#d9f3ec; --sync-ok-text:#0e6f5f;
+  --sync-off-bg:#f5ecd8; --sync-off-text:#8a5c0f;
+  --sync-err-bg:#fbe4e2; --sync-err-text:#a4362c;
+  --backdrop:rgba(20,30,38,.4);
+  color-scheme: light;
+}
+@media (prefers-color-scheme: light){
+  :root:not([data-theme="dark"]){
+    --bg:#f4f7f8; --card:#ffffff; --card2:#eef2f5; --border:#dde3e8;
+    --text:#182430; --muted:#5c7080; --accent:#149984; --accent-d:#0e6f5f;
+    --danger:#c8392f; --warn:#b5790f;
+    --missed-bg:#fbe4e2; --missed-text:#a4362c;
+    --toast-bg:#2a3742; --toast-text:#fff;
+    --sync-ok-bg:#d9f3ec; --sync-ok-text:#0e6f5f;
+    --sync-off-bg:#f5ecd8; --sync-off-text:#8a5c0f;
+    --sync-err-bg:#fbe4e2; --sync-err-text:#a4362c;
+    --backdrop:rgba(20,30,38,.4);
+    color-scheme: light;
+  }
 }
 *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
 html,body{height:100%;}
@@ -111,7 +152,7 @@ button{font-family:inherit;}
 }
 .cal-day.blank{background:transparent;}
 .cal-day.done{background:var(--accent-d); color:#fff; font-weight:700;}
-.cal-day.missed{background:#3a2226; color:#e2938e;}
+.cal-day.missed{background:var(--missed-bg); color:var(--missed-text);}
 .cal-day.future{opacity:.4;}
 .cal-day.today{box-shadow:0 0 0 2px var(--warn) inset;}
 .cal-day .count{position:absolute; bottom:2px; right:3px; font-size:9px; color:var(--muted);}
@@ -159,7 +200,7 @@ button{font-family:inherit;}
 .icon-btn.danger{color:var(--danger);}
 
 .modal-backdrop{
-  position:fixed; inset:0; background:rgba(0,0,0,.55); z-index:50; display:none;
+  position:fixed; inset:0; background:var(--backdrop); z-index:50; display:none;
   align-items:flex-end; justify-content:center;
 }
 .modal-backdrop.open{display:flex;}
@@ -178,7 +219,7 @@ button{font-family:inherit;}
 
 .toast{
   position:fixed; left:50%; bottom:calc(90px + env(safe-area-inset-bottom)); transform:translateX(-50%);
-  background:#26343f; color:#fff; padding:11px 16px; border-radius:12px; font-size:14px;
+  background:var(--toast-bg); color:var(--toast-text); padding:11px 16px; border-radius:12px; font-size:14px;
   display:flex; align-items:center; gap:14px; z-index:60; box-shadow:0 6px 20px rgba(0,0,0,.4);
   opacity:0; pointer-events:none; transition:opacity .2s ease;
 }
@@ -186,9 +227,21 @@ button{font-family:inherit;}
 .toast button{background:none; border:none; color:var(--accent); font-weight:700; font-size:14px; cursor:pointer;}
 
 .sync-badge{font-size:11px; padding:3px 9px; border-radius:20px; font-weight:700;}
-.sync-badge.ok{background:#1d3d34; color:#4fd8b8;}
-.sync-badge.off{background:#3a3020; color:var(--warn);}
-.sync-badge.err{background:#3a2226; color:#e2938e;}
+.sync-badge.ok{background:var(--sync-ok-bg); color:var(--sync-ok-text);}
+.sync-badge.off{background:var(--sync-off-bg); color:var(--sync-off-text);}
+.sync-badge.err{background:var(--sync-err-bg); color:var(--sync-err-text);}
+
+.theme-switch{display:flex; gap:6px; padding:12px 14px;}
+.theme-opt{
+  flex:1; background:var(--card2); border:1px solid var(--border); color:var(--muted);
+  border-radius:10px; padding:9px 4px; font-size:12.5px; font-weight:600; cursor:pointer;
+  display:flex; flex-direction:column; align-items:center; gap:3px;
+}
+.theme-opt .ic{font-size:16px;}
+.theme-opt.sel{border-color:var(--accent); color:var(--accent); background:var(--card);}
+
+.settings-row.clickable{cursor:pointer;}
+.row-actions{display:flex; gap:4px; flex-shrink:0;}
 
 .empty-state{text-align:center; padding:40px 20px; color:var(--muted);}
 .empty-state .big{font-size:40px; margin-bottom:10px;}
@@ -238,6 +291,15 @@ button{font-family:inherit;}
   <div class="card" id="manageActivities"></div>
   <button class="btn" style="margin-top:10px" id="addActivityBtn">+ Añadir actividad</button>
 
+  <div class="section-title">Apariencia</div>
+  <div class="card">
+    <div class="theme-switch" id="themeSwitch">
+      <div class="theme-opt" data-theme-opt="system"><span class="ic">📱</span>Automático</div>
+      <div class="theme-opt" data-theme-opt="light"><span class="ic">☀️</span>Claro</div>
+      <div class="theme-opt" data-theme-opt="dark"><span class="ic">🌙</span>Oscuro</div>
+    </div>
+  </div>
+
   <div class="section-title">Sincronización (GitHub)</div>
   <div class="card">
     <div class="settings-row">
@@ -257,7 +319,10 @@ button{font-family:inherit;}
     </div>
   </div>
 
-  <div class="section-title">Papelera</div>
+  <div class="section-title" style="display:flex; align-items:center; justify-content:space-between;">
+    <span>Papelera</span>
+    <button class="icon-btn danger" id="emptyTrashBtn" style="text-transform:none; font-size:12px; font-weight:700;">Vaciar</button>
+  </div>
   <div class="card" id="trashList"></div>
 </div>
 
@@ -374,6 +439,29 @@ function save(){
 }
 function getToken(){ return localStorage.getItem(TOKEN_KEY) || ''; }
 function setToken(t){ if(t) localStorage.setItem(TOKEN_KEY, t); else localStorage.removeItem(TOKEN_KEY); }
+
+// ---------- tema (claro/oscuro/automático) ----------
+const THEME_KEY = 'habitos_theme';
+function getThemePref(){
+  const t = localStorage.getItem(THEME_KEY);
+  return (t==='light'||t==='dark') ? t : 'system';
+}
+function applyTheme(pref){
+  const root = document.documentElement;
+  if(pref==='light' || pref==='dark'){
+    root.setAttribute('data-theme', pref);
+  } else {
+    root.removeAttribute('data-theme');
+  }
+  const isLight = pref==='light' || (pref==='system' && window.matchMedia('(prefers-color-scheme: light)').matches);
+  const meta = document.getElementById('themeColorMeta');
+  if(meta) meta.setAttribute('content', isLight ? '#149984' : '#16645a');
+}
+function setThemePref(pref){
+  if(pref==='system') localStorage.removeItem(THEME_KEY);
+  else localStorage.setItem(THEME_KEY, pref);
+  applyTheme(pref);
+}
 
 // ---------- helpers de datos ----------
 function activeTasks(){ return state.tasks.filter(t=>!t.archived); }
@@ -674,8 +762,14 @@ function renderAjustes(){
   state.tasks.filter(t=>!t.archived).forEach(t=>{
     const row = document.createElement('div'); row.className='settings-row';
     row.innerHTML = `<div><div class="lbl">${t.emoji||''} ${escapeHtml(t.name)}</div></div>
-      <div><button class="icon-btn danger" data-arch-task="${t.id}">🗑️</button></div>`;
+      <div class="row-actions">
+        <button class="icon-btn" data-edit-task="${t.id}">✏️</button>
+        <button class="icon-btn danger" data-arch-task="${t.id}">🗑️</button>
+      </div>`;
     tw.appendChild(row);
+  });
+  tw.querySelectorAll('[data-edit-task]').forEach(b=>{
+    b.addEventListener('click',()=>openTaskModal(b.dataset.editTask));
   });
   tw.querySelectorAll('[data-arch-task]').forEach(b=>{
     b.addEventListener('click',()=>{
@@ -695,8 +789,14 @@ function renderAjustes(){
   state.activities.filter(a=>!a.archived).forEach(a=>{
     const row = document.createElement('div'); row.className='settings-row';
     row.innerHTML = `<div><div class="lbl">${a.emoji||''} ${escapeHtml(a.name)}</div></div>
-      <div><button class="icon-btn danger" data-arch-act="${a.id}">🗑️</button></div>`;
+      <div class="row-actions">
+        <button class="icon-btn" data-edit-act="${a.id}">✏️</button>
+        <button class="icon-btn danger" data-arch-act="${a.id}">🗑️</button>
+      </div>`;
     aw.appendChild(row);
+  });
+  aw.querySelectorAll('[data-edit-act]').forEach(b=>{
+    b.addEventListener('click',()=>openActivityModal(b.dataset.editAct));
   });
   aw.querySelectorAll('[data-arch-act]').forEach(b=>{
     b.addEventListener('click',()=>{
@@ -708,6 +808,7 @@ function renderAjustes(){
     });
   });
 
+  renderThemeSwitch();
   renderSyncStatus();
   renderTrash();
 }
@@ -726,20 +827,29 @@ function renderTrash(){
   archTasks.forEach(t=>{
     const row=document.createElement('div'); row.className='settings-row';
     row.innerHTML = `<div><div class="lbl">${t.emoji||''} ${escapeHtml(t.name)}</div><div class="sub">Tarea diaria eliminada</div></div>
-      <button class="icon-btn" data-restore-task="${t.id}">↺</button>`;
+      <div class="row-actions">
+        <button class="icon-btn" data-restore-task="${t.id}">↺</button>
+        <button class="icon-btn danger" data-purge-task="${t.id}">🗑️</button>
+      </div>`;
     wrap.appendChild(row);
   });
   archActs.forEach(a=>{
     const row=document.createElement('div'); row.className='settings-row';
     row.innerHTML = `<div><div class="lbl">${a.emoji||''} ${escapeHtml(a.name)}</div><div class="sub">Actividad eliminada</div></div>
-      <button class="icon-btn" data-restore-act="${a.id}">↺</button>`;
+      <div class="row-actions">
+        <button class="icon-btn" data-restore-act="${a.id}">↺</button>
+        <button class="icon-btn danger" data-purge-act="${a.id}">🗑️</button>
+      </div>`;
     wrap.appendChild(row);
   });
   delLogs.forEach(e=>{
     const act = state.activities.find(a=>a.id===e.activityId);
     const row=document.createElement('div'); row.className='settings-row';
     row.innerHTML = `<div><div class="lbl">${act?act.emoji:''} ${act?escapeHtml(act.name):'(actividad borrada)'}</div><div class="sub">${e.date} ${e.time}</div></div>
-      <button class="icon-btn" data-restore-log="${e.id}">↺</button>`;
+      <div class="row-actions">
+        <button class="icon-btn" data-restore-log="${e.id}">↺</button>
+        <button class="icon-btn danger" data-purge-log="${e.id}">🗑️</button>
+      </div>`;
     wrap.appendChild(row);
   });
   wrap.querySelectorAll('[data-restore-task]').forEach(b=>b.addEventListener('click',()=>{
@@ -751,7 +861,52 @@ function renderTrash(){
   wrap.querySelectorAll('[data-restore-log]').forEach(b=>b.addEventListener('click',()=>{
     restoreLog(b.dataset.restoreLog); renderAjustes(); renderHoy();
   }));
+  wrap.querySelectorAll('[data-purge-task]').forEach(b=>b.addEventListener('click',()=>{
+    const id = b.dataset.purgeTask;
+    const t = state.tasks.find(x=>x.id===id);
+    if(!confirm('Eliminar definitivamente "'+t.name+'" y todo su historial? No se puede deshacer.')) return;
+    purgeTask(id); renderAjustes(); renderHoy();
+  }));
+  wrap.querySelectorAll('[data-purge-act]').forEach(b=>b.addEventListener('click',()=>{
+    const id = b.dataset.purgeAct;
+    const a = state.activities.find(x=>x.id===id);
+    if(!confirm('Eliminar definitivamente "'+a.name+'" y todos sus registros? No se puede deshacer.')) return;
+    purgeActivity(id); renderAjustes(); renderHoy();
+  }));
+  wrap.querySelectorAll('[data-purge-log]').forEach(b=>b.addEventListener('click',()=>{
+    const id = b.dataset.purgeLog;
+    delete state.activityLog[id]; save();
+    renderAjustes(); renderHoy();
+  }));
 }
+
+function purgeTask(id){
+  state.tasks = state.tasks.filter(t=>t.id!==id);
+  Object.keys(state.completions).forEach(k=>{
+    if(k.indexOf(id+'|')===0) delete state.completions[k];
+  });
+  save();
+}
+function purgeActivity(id){
+  state.activities = state.activities.filter(a=>a.id!==id);
+  Object.keys(state.activityLog).forEach(k=>{
+    if(state.activityLog[k].activityId===id) delete state.activityLog[k];
+  });
+  save();
+}
+
+document.getElementById('emptyTrashBtn').addEventListener('click',()=>{
+  const archTasks = state.tasks.filter(t=>t.archived);
+  const archActs = state.activities.filter(a=>a.archived);
+  const delLogIds = Object.keys(state.activityLog).filter(k=>state.activityLog[k].deleted);
+  if(!archTasks.length && !archActs.length && !delLogIds.length) return;
+  if(!confirm('Vaciar la papelera definitivamente? Se perderá el historial de lo archivado. No se puede deshacer.')) return;
+  archTasks.forEach(t=>purgeTask(t.id));
+  archActs.forEach(a=>purgeActivity(a.id));
+  delLogIds.forEach(id=>delete state.activityLog[id]);
+  save();
+  renderAjustes(); renderHoy();
+});
 
 function renderSyncStatus(){
   const badge = document.getElementById('syncBadge');
@@ -779,8 +934,26 @@ document.querySelectorAll('.modal-backdrop').forEach(m=>{
   m.addEventListener('click',(e)=>{ if(e.target===m) m.classList.remove('open'); });
 });
 
-// ---------- añadir tarea ----------
-let pickedTaskEmoji = EMOJIS[0];
+// ---------- tema: UI ----------
+function renderThemeSwitch(){
+  const pref = getThemePref();
+  document.querySelectorAll('#themeSwitch .theme-opt').forEach(el=>{
+    el.classList.toggle('sel', el.dataset.themeOpt===pref);
+  });
+}
+document.querySelectorAll('#themeSwitch .theme-opt').forEach(el=>{
+  el.addEventListener('click',()=>{
+    setThemePref(el.dataset.themeOpt);
+    renderThemeSwitch();
+  });
+});
+if(window.matchMedia){
+  window.matchMedia('(prefers-color-scheme: light)').addEventListener('change',()=>{
+    if(getThemePref()==='system') applyTheme('system');
+  });
+}
+
+// ---------- añadir/editar tarea o actividad ----------
 function buildEmojiPicker(containerId, selected, onPick){
   const c = document.getElementById(containerId);
   c.innerHTML='';
@@ -796,33 +969,57 @@ function buildEmojiPicker(containerId, selected, onPick){
     c.appendChild(b);
   });
 }
-document.getElementById('addTaskBtn').addEventListener('click',()=>{
-  pickedTaskEmoji = EMOJIS[0];
-  document.getElementById('taskNameInput').value='';
-  buildEmojiPicker('taskEmojiPicker', pickedTaskEmoji, em=>pickedTaskEmoji=em);
+let editingTaskId = null;
+let editingActivityId = null;
+let taskModalEmoji = EMOJIS[0];
+let activityModalEmoji = EMOJIS[0];
+
+function openTaskModal(id){
+  const task = id ? state.tasks.find(x=>x.id===id) : null;
+  editingTaskId = task ? task.id : null;
+  taskModalEmoji = task ? (task.emoji||EMOJIS[0]) : EMOJIS[0];
+  document.getElementById('taskModalTitle').textContent = task ? 'Editar tarea diaria' : 'Nueva tarea diaria';
+  document.getElementById('taskNameInput').value = task ? task.name : '';
+  buildEmojiPicker('taskEmojiPicker', taskModalEmoji, em=>taskModalEmoji=em);
   openModal('modalTask');
-});
+}
+function openActivityModal(id){
+  const act = id ? state.activities.find(x=>x.id===id) : null;
+  editingActivityId = act ? act.id : null;
+  activityModalEmoji = act ? (act.emoji||EMOJIS[0]) : EMOJIS[0];
+  document.getElementById('activityModalTitle').textContent = act ? 'Editar actividad' : 'Nueva actividad';
+  document.getElementById('activityNameInput').value = act ? act.name : '';
+  buildEmojiPicker('activityEmojiPicker', activityModalEmoji, em=>activityModalEmoji=em);
+  openModal('modalActivity');
+}
+
+document.getElementById('addTaskBtn').addEventListener('click',()=>openTaskModal(null));
 document.getElementById('taskSaveBtn').addEventListener('click',()=>{
   const name = document.getElementById('taskNameInput').value.trim();
   if(!name) return;
   const t = now();
-  state.tasks.push({id:uid(), name, emoji:pickedTaskEmoji, archived:false, createdAt:t, updatedAt:t});
+  if(editingTaskId){
+    const task = state.tasks.find(x=>x.id===editingTaskId);
+    task.name = name; task.emoji = taskModalEmoji; task.updatedAt = t;
+  } else {
+    state.tasks.push({id:uid(), name, emoji:taskModalEmoji, archived:false, createdAt:t, updatedAt:t});
+  }
   save();
   closeModal('modalTask');
   renderHoy(); renderAjustes();
 });
 
-document.getElementById('addActivityBtn').addEventListener('click',()=>{
-  pickedTaskEmoji = EMOJIS[0];
-  document.getElementById('activityNameInput').value='';
-  buildEmojiPicker('activityEmojiPicker', pickedTaskEmoji, em=>pickedTaskEmoji=em);
-  openModal('modalActivity');
-});
+document.getElementById('addActivityBtn').addEventListener('click',()=>openActivityModal(null));
 document.getElementById('activitySaveBtn').addEventListener('click',()=>{
   const name = document.getElementById('activityNameInput').value.trim();
   if(!name) return;
   const t = now();
-  state.activities.push({id:uid(), name, emoji:pickedTaskEmoji, archived:false, createdAt:t, updatedAt:t});
+  if(editingActivityId){
+    const act = state.activities.find(x=>x.id===editingActivityId);
+    act.name = name; act.emoji = activityModalEmoji; act.updatedAt = t;
+  } else {
+    state.activities.push({id:uid(), name, emoji:activityModalEmoji, archived:false, createdAt:t, updatedAt:t});
+  }
   save();
   closeModal('modalActivity');
   renderHoy(); renderAjustes();
@@ -974,6 +1171,7 @@ function mergeMap(a, b){
 }
 
 // ---------- inicio ----------
+applyTheme(getThemePref());
 setHeaderDate();
 renderHoy();
 if(getToken() && state.config.repo){ syncNow(); }
