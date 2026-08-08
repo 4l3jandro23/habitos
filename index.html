@@ -409,10 +409,39 @@ function defaultState(){
     completions: {},  // key `${taskId}|${date}` -> {taskId,date,done,updatedAt}
     activityLog: {},  // id -> {id,activityId,date,time,ts,deleted,updatedAt}
     config: { repo:'4l3jandro23/habitos-data', path:'habitos-sync.json', lastSync:0, sha:null },
+    seedV2Applied: false,
   };
 }
 
+// listas de ejemplo (30 + 30) — el usuario puede editarlas/borrarlas libremente desde Ajustes
+const TASK_SEED_V2 = [
+  ['Tomar la medicación','💊'], ['Hacer la cama','🛏️'], ['Ordenar la habitación','🧹'],
+  ['Fregar los platos','🍽️'], ['Sacar la basura','🗑️'], ['Regar las plantas','🌱'],
+  ['Ducharme','🚿'], ['Rutina facial','🧴'], ['Protector solar','☀️'],
+  ['Preparar la ropa de mañana','👔'], ['Leer 10 minutos','📚'], ['Meditar','🧘'],
+  ['Planificar el día','📝'], ['Anotar los gastos del día','💰'], ['Cargar el móvil','🔋'],
+  ['Revisar puertas y ventanas','🚪'], ['Poner el despertador','⏰'], ['Apagar pantallas antes de dormir','📵'],
+  ['Preparar la comida de mañana','🥗'], ['Limpieza rápida del baño','🧻'], ['Ventilar la casa','🪟'],
+  ['Escribir en el diario','📓'], ['Anotar algo por lo que estar agradecido','🙏'], ['Revisar el saldo bancario','🏦'],
+  ['Vaciar la bandeja de entrada','📧'], ['Bloque de trabajo sin distracciones','🧠'], ['Lavadora (poner o recoger)','🧦'],
+  ['Ordenar el escritorio','🗄️'], ['Revisar el correo importante','🧾'], ['Rutina completa antes de dormir','🌙'],
+];
+const ACTIVITY_SEED_V2 = [
+  ['Ejercicio','🏃'], ['Lavarme los dientes','🦷'], ['Vaso de agua','💧'],
+  ['Café','☕'], ['Tentempié','🍎'], ['Comida principal','🍽️'],
+  ['Paseo','🚶'], ['Estiramientos','🧘'], ['Siesta','😴'],
+  ['Descanso de pantalla','📵'], ['Crema hidratante','🧴'], ['Música o podcast','🎧'],
+  ['Llamada a alguien','📞'], ['Salir al aire libre','🌳'], ['Pausa de respiración','🌬️'],
+  ['Cardio','🚴'], ['Entrenamiento de fuerza','🏋️'], ['Levantarme y moverme','🧍'],
+  ['Batido o suplemento','🥤'], ['Sesión de estudio','🧠'], ['Sesión de escritura','✍️'],
+  ['Tiempo creativo','🎨'], ['Tiempo de ocio','🎮'], ['Rato en redes sociales','📱'],
+  ['Compra rápida','🛒'], ['Limpieza puntual','🧽'], ['Trayecto en coche o transporte','🚗'],
+  ['Conversación importante','🗣️'], ['Hora de acostarme','💤'], ['Tender/recoger ropa','🧺'],
+];
+
 let state = load();
+applySeedV2();
+
 function load(){
   try{
     const raw = localStorage.getItem(STORE_KEY);
@@ -424,15 +453,29 @@ function load(){
 function seedDefaults(){
   const s = defaultState();
   const t = now();
-  s.tasks = [
-    {id:uid(), name:'Tomar la medicación', emoji:'💊', archived:false, createdAt:t, updatedAt:t},
-    {id:uid(), name:'Hacer la cama', emoji:'🛏️', archived:false, createdAt:t, updatedAt:t},
-  ];
-  s.activities = [
-    {id:uid(), name:'Ejercicio', emoji:'🏃', archived:false, createdAt:t, updatedAt:t},
-    {id:uid(), name:'Lavarme los dientes', emoji:'🦷', archived:false, createdAt:t, updatedAt:t},
-  ];
+  s.tasks = TASK_SEED_V2.map(([name,emoji])=>({id:uid(), name, emoji, archived:false, createdAt:t, updatedAt:t}));
+  s.activities = ACTIVITY_SEED_V2.map(([name,emoji])=>({id:uid(), name, emoji, archived:false, createdAt:t, updatedAt:t}));
+  s.seedV2Applied = true;
   return s;
+}
+// añade (sin duplicar por nombre) las tareas/actividades nuevas a instalaciones que ya tenían datos
+function applySeedV2(){
+  if(state.seedV2Applied) return;
+  const t = now();
+  const existingTaskNames = new Set(state.tasks.map(x=>x.name.trim().toLowerCase()));
+  TASK_SEED_V2.forEach(([name,emoji])=>{
+    if(!existingTaskNames.has(name.trim().toLowerCase())){
+      state.tasks.push({id:uid(), name, emoji, archived:false, createdAt:t, updatedAt:t});
+    }
+  });
+  const existingActNames = new Set(state.activities.map(x=>x.name.trim().toLowerCase()));
+  ACTIVITY_SEED_V2.forEach(([name,emoji])=>{
+    if(!existingActNames.has(name.trim().toLowerCase())){
+      state.activities.push({id:uid(), name, emoji, archived:false, createdAt:t, updatedAt:t});
+    }
+  });
+  state.seedV2Applied = true;
+  save();
 }
 function save(){
   localStorage.setItem(STORE_KEY, JSON.stringify(state));
