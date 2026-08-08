@@ -153,9 +153,19 @@ button{font-family:inherit;}
 .cal-day.blank{background:transparent;}
 .cal-day.done{background:var(--accent-d); color:#fff; font-weight:700;}
 .cal-day.missed{background:var(--missed-bg); color:var(--missed-text);}
+.cal-day.skip{background:var(--card2); color:var(--muted); border:1px dashed var(--border);}
 .cal-day.future{opacity:.4;}
 .cal-day.today{box-shadow:0 0 0 2px var(--warn) inset;}
 .cal-day .count{position:absolute; bottom:2px; right:3px; font-size:9px; color:var(--muted);}
+.cal-legend{display:flex; flex-wrap:wrap; gap:12px; margin-top:14px; font-size:11.5px; color:var(--muted);}
+.cal-legend span{display:inline-flex; align-items:center; gap:5px;}
+.cal-legend i{width:10px; height:10px; border-radius:3px; display:inline-block;}
+
+.freq-row{display:flex; gap:8px;}
+.freq-row input{flex:1;}
+.freq-row select{flex:1.3;}
+.warn-flag{color:var(--danger); font-weight:700;}
+.meta-line{font-size:12px; color:var(--muted); margin-top:2px;}
 
 .fab{
   position:fixed; right:18px; bottom:calc(88px + env(safe-area-inset-bottom));
@@ -274,6 +284,8 @@ button{font-family:inherit;}
     <button id="calNext">›</button>
   </div>
   <div class="cal-grid" id="calGrid"></div>
+  <div class="cal-legend" id="calLegend" style="display:none;"></div>
+  <div class="empty-hint" id="calHint" style="margin-top:10px;">Toca un día para pasar de pendiente → hecho → día libre.</div>
 </div>
 
 <!-- ESTADÍSTICAS -->
@@ -342,6 +354,16 @@ button{font-family:inherit;}
     <h3 id="taskModalTitle">Nueva tarea diaria</h3>
     <div class="emoji-picker" id="taskEmojiPicker"></div>
     <div class="field"><label>Nombre</label><input id="taskNameInput" placeholder="p.ej. Tomar la medicación" maxlength="40"></div>
+    <div class="field">
+      <label>Frecuencia ideal</label>
+      <div class="freq-row">
+        <input id="taskFreqValue" type="number" min="1" step="1" inputmode="numeric">
+        <select id="taskFreqUnit">
+          <option value="days">días</option>
+          <option value="hours">horas</option>
+        </select>
+      </div>
+    </div>
     <button class="btn primary" id="taskSaveBtn">Guardar</button>
   </div>
 </div>
@@ -352,6 +374,16 @@ button{font-family:inherit;}
     <h3 id="activityModalTitle">Nueva actividad</h3>
     <div class="emoji-picker" id="activityEmojiPicker"></div>
     <div class="field"><label>Nombre</label><input id="activityNameInput" placeholder="p.ej. Ejercicio" maxlength="40"></div>
+    <div class="field">
+      <label>Frecuencia ideal</label>
+      <div class="freq-row">
+        <input id="activityFreqValue" type="number" min="1" step="1" inputmode="numeric">
+        <select id="activityFreqUnit">
+          <option value="days">días</option>
+          <option value="hours">horas</option>
+        </select>
+      </div>
+    </div>
     <button class="btn primary" id="activitySaveBtn">Guardar</button>
   </div>
 </div>
@@ -441,6 +473,7 @@ const ACTIVITY_SEED_V2 = [
 
 let state = load();
 applySeedV2();
+applyTargetDefaults();
 
 function load(){
   try{
@@ -476,6 +509,13 @@ function applySeedV2(){
   });
   state.seedV2Applied = true;
   save();
+}
+// asegura que toda tarea/actividad (nueva o de antes de esta función) tenga frecuencia ideal
+function applyTargetDefaults(){
+  let changed = false;
+  state.tasks.forEach(t=>{ if(t.targetValue==null){ t.targetValue=1; t.targetUnit='days'; changed=true; } });
+  state.activities.forEach(a=>{ if(a.targetValue==null){ a.targetValue=1; a.targetUnit='days'; changed=true; } });
+  if(changed) save();
 }
 function save(){
   localStorage.setItem(STORE_KEY, JSON.stringify(state));
@@ -515,10 +555,58 @@ function isDone(taskId,date){
   const c = state.completions[compKey(taskId,date)];
   return !!(c && c.done);
 }
+function isSkipped(taskId,date){
+  const c = state.completions[compKey(taskId,date)];
+  return !!(c && c.skip);
+}
 function setDone(taskId,date,done){
   const k = compKey(taskId,date);
-  state.completions[k] = {taskId, date, done, updatedAt: now()};
+  state.completions[k] = {taskId, date, done, skip:false, updatedAt: now()};
   save();
+}
+function setSkip(taskId,date,skip){
+  const k = compKey(taskId,date);
+  state.completions[k] = {taskId, date, done:false, skip, updatedAt: now()};
+  save();
+}
+function targetToMs(item){
+  const val = item.targetValue || 1;
+  const unit = item.targetUnit || 'days';
+  return unit==='hours' ? val*3600000 : val*86400000;
+}
+function targetToDays(item){
+  const val = item.targetValue || 1;
+  const unit = item.targetUnit || 'days';
+  return unit==='hours' ? val/24 : val;
+}
+function targetLabel(item){
+  const val = item.targetValue || 1;
+  const unit = item.targetUnit || 'days';
+  if(unit==='hours') return val===1 ? 'ideal: cada hora' : 'ideal: cada '+val+' horas';
+  if(val===1) return 'ideal: cada día';
+  return 'ideal: cada '+val+' días';
+}
+function lastDoneDate(taskId){
+  const dates = Object.keys(state.completions)
+    .filter(k=>state.completions[k].taskId===taskId && state.completions[k].done)
+    .map(k=>state.completions[k].date).sort();
+  return dates.length ? dates[dates.length-1] : null;
+}
+function taskOverdue(task){
+  const last = lastDoneDate(task.id);
+  if(last===null) return false;
+  const days = Math.round((new Date(todayKey()+'T00:00:00') - new Date(last+'T00:00:00'))/86400000);
+  return days > targetToDays(task);
+}
+function lastActivityTs(activityId){
+  const events = Object.values(state.activityLog).filter(e=>e.activityId===activityId && !e.deleted);
+  if(!events.length) return null;
+  return Math.max(...events.map(e=>e.ts));
+}
+function activityOverdue(act){
+  const last = lastActivityTs(act.id);
+  if(last===null) return false;
+  return (now() - last) > targetToMs(act);
 }
 
 function logsForActivityOnDate(activityId,date){
@@ -546,34 +634,39 @@ function restoreLog(id){
   save();
 }
 
-// racha actual: cuenta hacia atrás desde hoy (si hoy no está hecho, empieza desde ayer)
+// racha actual: cuenta hacia atrás desde hoy. Los días "libres" (skip) no rompen
+// la racha pero tampoco suman; si hoy aún no está hecho ni marcado, se empieza desde ayer.
 function currentStreak(taskId){
+  const task = state.tasks.find(t=>t.id===taskId);
+  const createdKey = task ? dateKey(new Date(task.createdAt)) : null;
   let d = new Date();
   let k = dateKey(d);
-  let streak = 0;
-  if(!isDone(taskId,k)){
+  if(!isDone(taskId,k) && !isSkipped(taskId,k)){
     d.setDate(d.getDate()-1);
-    k = dateKey(d);
   }
-  while(isDone(taskId,k)){
-    streak++;
-    d.setDate(d.getDate()-1);
+  let streak = 0;
+  while(true){
     k = dateKey(d);
+    if(createdKey && k < createdKey) break;
+    if(isDone(taskId,k)){ streak++; d.setDate(d.getDate()-1); continue; }
+    if(isSkipped(taskId,k)){ d.setDate(d.getDate()-1); continue; }
+    break;
   }
   return streak;
 }
 function bestStreak(taskId){
-  const dates = Object.values(state.completions)
-    .filter(c=>c.taskId===taskId && c.done)
-    .map(c=>c.date).sort();
-  if(!dates.length) return 0;
-  let best=1, cur=1;
-  for(let i=1;i<dates.length;i++){
-    const prev = new Date(dates[i-1]+'T00:00:00');
-    const curD = new Date(dates[i]+'T00:00:00');
-    const diff = Math.round((curD-prev)/86400000);
-    if(diff===1){ cur++; } else if(diff===0){ /* dup */ } else { cur=1; }
-    if(cur>best) best=cur;
+  const task = state.tasks.find(t=>t.id===taskId);
+  if(!task) return 0;
+  let d = new Date(task.createdAt);
+  d.setHours(0,0,0,0);
+  const end = new Date();
+  end.setHours(0,0,0,0);
+  let best=0, cur=0;
+  while(d<=end){
+    const k = dateKey(d);
+    if(isDone(taskId,k)){ cur++; if(cur>best) best=cur; }
+    else if(!isSkipped(taskId,k)){ cur=0; }
+    d.setDate(d.getDate()+1);
   }
   return best;
 }
@@ -589,12 +682,14 @@ function monthCompletionPct(taskId, year, month){
   } else if(created > new Date(year, month, daysElapsed)){
     return null; // task didn't exist yet
   }
-  const totalDays = Math.max(1, daysElapsed - startDay + 1);
-  let done = 0;
+  let done = 0, skipped = 0;
   for(let d=startDay; d<=daysElapsed; d++){
     const k = year+'-'+pad(month+1)+'-'+pad(d);
     if(isDone(taskId,k)) done++;
+    else if(isSkipped(taskId,k)) skipped++;
   }
+  const totalDays = (daysElapsed - startDay + 1) - skipped;
+  if(totalDays<=0) return null;
   return Math.round((done/totalDays)*100);
 }
 
@@ -647,9 +742,10 @@ function renderHoy(){
     const row = document.createElement('div');
     row.className = 'task-row'+(done?' done':'');
     const streakN = currentStreak(t.id);
+    const overdue = !done && taskOverdue(t);
     row.innerHTML = `<div class="emoji">${t.emoji||'✅'}</div>
       <div class="info"><div class="name">${escapeHtml(t.name)}</div>
-      <div class="streak">🔥 ${streakN} día${streakN===1?' seguido':'s seguidos'}</div></div>
+      <div class="streak">🔥 ${streakN} día${streakN===1?' seguido':'s seguidos'} · ${targetLabel(t)}${overdue?' · <span class="warn-flag">⚠️ atrasada</span>':''}</div></div>
       <div class="check">${done?'✓':''}</div>`;
     row.addEventListener('click',()=>{
       const wasDone = isDone(t.id,k);
@@ -670,6 +766,7 @@ function renderHoy(){
   }
   acts.forEach(a=>{
     const logs = logsForActivityOnDate(a.id,k);
+    const overdue = activityOverdue(a);
     const card = document.createElement('div');
     card.className='activity-card';
     let timesHtml = logs.length
@@ -679,7 +776,9 @@ function renderHoy(){
         <div class="emoji">${a.emoji||'📌'}</div>
         <div class="name">${escapeHtml(a.name)}</div>
         <button class="log-btn" data-add="${a.id}">+ Ahora</button>
-      </div>${timesHtml}`;
+      </div>
+      <div class="meta-line">${targetLabel(a)}${overdue?' · <span class="warn-flag">⚠️ atrasada</span>':''}</div>
+      ${timesHtml}`;
     wrapA.appendChild(card);
   });
   wrapA.querySelectorAll('[data-add]').forEach(btn=>{
@@ -752,10 +851,22 @@ function renderCalendar(){
     const isFuture = dateStr > todayK;
     if(kind==='task'){
       const done = isDone(id,dateStr);
+      const skip = isSkipped(id,dateStr);
       if(isFuture) cell.classList.add('future');
       else if(done) cell.classList.add('done');
+      else if(skip) cell.classList.add('skip');
       else cell.classList.add('missed');
-      cell.textContent = d;
+      cell.textContent = skip ? '–' : d;
+      if(!isFuture){
+        cell.style.cursor = 'pointer';
+        cell.addEventListener('click',()=>{
+          if(done){ setSkip(id,dateStr,true); }
+          else if(skip){ setDone(id,dateStr,false); /* limpia: vuelve a pendiente */ }
+          else { setDone(id,dateStr,true); }
+          renderCalendar();
+          if(dateStr===todayK) renderHoy();
+        });
+      }
     } else {
       const count = logsForActivityOnDate(id,dateStr).length;
       if(isFuture) cell.classList.add('future');
@@ -764,6 +875,18 @@ function renderCalendar(){
     }
     if(dateStr===todayK) cell.classList.add('today');
     grid.appendChild(cell);
+  }
+  const legend = document.getElementById('calLegend');
+  const hint = document.getElementById('calHint');
+  if(kind==='task'){
+    legend.style.display='flex';
+    legend.innerHTML = `<span><i style="background:var(--accent-d)"></i>Hecho</span>
+      <span><i style="background:var(--missed-bg)"></i>Pendiente</span>
+      <span><i style="background:var(--card2); border:1px dashed var(--border);"></i>Día libre</span>`;
+    hint.style.display='block';
+  } else {
+    legend.style.display='none';
+    hint.style.display='none';
   }
 }
 
@@ -784,6 +907,7 @@ function renderStats(){
     const card = document.createElement('div');
     card.className='stat-card';
     card.innerHTML = `<div class="stat-head"><span class="emoji">${t.emoji||'✅'}</span><span class="name">${escapeHtml(t.name)}</span></div>
+      <div class="meta-line" style="margin:-6px 0 10px;">${targetLabel(t)}</div>
       <div class="stat-grid">
         <div class="stat-box"><div class="val">${cur}</div><div class="lbl">Racha actual</div></div>
         <div class="stat-box"><div class="val">${best}</div><div class="lbl">Mejor racha</div></div>
@@ -804,7 +928,7 @@ function renderAjustes(){
   }
   state.tasks.filter(t=>!t.archived).forEach(t=>{
     const row = document.createElement('div'); row.className='settings-row';
-    row.innerHTML = `<div><div class="lbl">${t.emoji||''} ${escapeHtml(t.name)}</div></div>
+    row.innerHTML = `<div><div class="lbl">${t.emoji||''} ${escapeHtml(t.name)}</div><div class="sub">${targetLabel(t)}</div></div>
       <div class="row-actions">
         <button class="icon-btn" data-edit-task="${t.id}">✏️</button>
         <button class="icon-btn danger" data-arch-task="${t.id}">🗑️</button>
@@ -831,7 +955,7 @@ function renderAjustes(){
   }
   state.activities.filter(a=>!a.archived).forEach(a=>{
     const row = document.createElement('div'); row.className='settings-row';
-    row.innerHTML = `<div><div class="lbl">${a.emoji||''} ${escapeHtml(a.name)}</div></div>
+    row.innerHTML = `<div><div class="lbl">${a.emoji||''} ${escapeHtml(a.name)}</div><div class="sub">${targetLabel(a)}</div></div>
       <div class="row-actions">
         <button class="icon-btn" data-edit-act="${a.id}">✏️</button>
         <button class="icon-btn danger" data-arch-act="${a.id}">🗑️</button>
@@ -1023,6 +1147,8 @@ function openTaskModal(id){
   taskModalEmoji = task ? (task.emoji||EMOJIS[0]) : EMOJIS[0];
   document.getElementById('taskModalTitle').textContent = task ? 'Editar tarea diaria' : 'Nueva tarea diaria';
   document.getElementById('taskNameInput').value = task ? task.name : '';
+  document.getElementById('taskFreqValue').value = task ? task.targetValue : 1;
+  document.getElementById('taskFreqUnit').value = task ? task.targetUnit : 'days';
   buildEmojiPicker('taskEmojiPicker', taskModalEmoji, em=>taskModalEmoji=em);
   openModal('modalTask');
 }
@@ -1032,20 +1158,32 @@ function openActivityModal(id){
   activityModalEmoji = act ? (act.emoji||EMOJIS[0]) : EMOJIS[0];
   document.getElementById('activityModalTitle').textContent = act ? 'Editar actividad' : 'Nueva actividad';
   document.getElementById('activityNameInput').value = act ? act.name : '';
+  document.getElementById('activityFreqValue').value = act ? act.targetValue : 1;
+  document.getElementById('activityFreqUnit').value = act ? act.targetUnit : 'days';
   buildEmojiPicker('activityEmojiPicker', activityModalEmoji, em=>activityModalEmoji=em);
   openModal('modalActivity');
+}
+
+function readFreqInput(valueId, unitId){
+  const raw = parseInt(document.getElementById(valueId).value, 10);
+  const value = (Number.isFinite(raw) && raw>=1) ? raw : 1;
+  const unit = document.getElementById(unitId).value==='hours' ? 'hours' : 'days';
+  return {value, unit};
 }
 
 document.getElementById('addTaskBtn').addEventListener('click',()=>openTaskModal(null));
 document.getElementById('taskSaveBtn').addEventListener('click',()=>{
   const name = document.getElementById('taskNameInput').value.trim();
   if(!name) return;
+  const freq = readFreqInput('taskFreqValue','taskFreqUnit');
   const t = now();
   if(editingTaskId){
     const task = state.tasks.find(x=>x.id===editingTaskId);
-    task.name = name; task.emoji = taskModalEmoji; task.updatedAt = t;
+    task.name = name; task.emoji = taskModalEmoji;
+    task.targetValue = freq.value; task.targetUnit = freq.unit;
+    task.updatedAt = t;
   } else {
-    state.tasks.push({id:uid(), name, emoji:taskModalEmoji, archived:false, createdAt:t, updatedAt:t});
+    state.tasks.push({id:uid(), name, emoji:taskModalEmoji, archived:false, targetValue:freq.value, targetUnit:freq.unit, createdAt:t, updatedAt:t});
   }
   save();
   closeModal('modalTask');
@@ -1056,12 +1194,15 @@ document.getElementById('addActivityBtn').addEventListener('click',()=>openActiv
 document.getElementById('activitySaveBtn').addEventListener('click',()=>{
   const name = document.getElementById('activityNameInput').value.trim();
   if(!name) return;
+  const freq = readFreqInput('activityFreqValue','activityFreqUnit');
   const t = now();
   if(editingActivityId){
     const act = state.activities.find(x=>x.id===editingActivityId);
-    act.name = name; act.emoji = activityModalEmoji; act.updatedAt = t;
+    act.name = name; act.emoji = activityModalEmoji;
+    act.targetValue = freq.value; act.targetUnit = freq.unit;
+    act.updatedAt = t;
   } else {
-    state.activities.push({id:uid(), name, emoji:activityModalEmoji, archived:false, createdAt:t, updatedAt:t});
+    state.activities.push({id:uid(), name, emoji:activityModalEmoji, archived:false, targetValue:freq.value, targetUnit:freq.unit, createdAt:t, updatedAt:t});
   }
   save();
   closeModal('modalActivity');
