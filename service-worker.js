@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'habitos-v2';
+const CACHE_VERSION = 'habitos-v3';
 const ASSETS = [
   './',
   './index.html',
@@ -9,7 +9,11 @@ const ASSETS = [
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_VERSION).then((cache) => cache.addAll(ASSETS)).then(() => self.skipWaiting())
+    caches.open(CACHE_VERSION)
+      .then((cache) => Promise.all(ASSETS.map((url) =>
+        fetch(url, { cache: 'reload' }).then((res) => cache.put(url, res))
+      )))
+      .then(() => self.skipWaiting())
   );
 });
 
